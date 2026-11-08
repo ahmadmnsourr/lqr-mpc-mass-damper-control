@@ -1,0 +1,4 @@
+Controller,SettlingTime_s,PeakForce,ControlEnergy,Overshoot_percent,ForceLimitViolation
+Integral LQR (original),2.0140000000000002,3.120999841479679,3.885120658493973,0.0,2.120999841479679
+Integral LQR (R=100; new tuning),5.165,0.8659473387194814,0.7955228615374749,4.468352670414144,0.0
+Constrained MPC (original settings),1.991,1.0,2.1448894591277043,0.9953736695374804,0.0
