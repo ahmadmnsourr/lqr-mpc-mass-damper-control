@@ -94,8 +94,10 @@ $$
 
 The control law is $u_k=-K_{\mathrm{aug}}z_k$, with $K_{\mathrm{aug}}$ computed by MATLAB's `dlqr` from
 
+
 $$
-Q_{\mathrm{aug}}=\operatorname{diag}(850,150,1),\qquad R=1.
+Q_{\mathrm{aug}} = \mathrm{diag}(850, 150, 1),
+\qquad R = 1.
 $$
 
 A second, **illustrative** LQR configuration uses $R=100$ to study the effect of penalizing the applied force more heavily. LQR in this project is **unconstrained**: a lower calculated peak force is not equivalent to a hard actuator guarantee.
