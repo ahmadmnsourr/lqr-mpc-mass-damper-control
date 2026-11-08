@@ -1,138 +1,142 @@
-# LQR vs Constrained MPC — Mass–Damper Position Tracking
+# Discrete-Time LQR vs Constrained MPC for Mass–Damper Control
 
-**A focused MATLAB control project about actuator limits and tracking performance.**
+**Reference tracking under actuator-force constraints | MATLAB & Simulink**
 
-> **Research question:** Can model predictive control follow a position step in about two seconds **without exceeding a force limit of ±1**, when the original integral-action LQR demands more force?
+This project investigates a practical question in optimal control: **can a controller track a position reference quickly while respecting a limited actuator force?** A discrete-time linear–quadratic regulator (LQR) with integral action is compared with constrained model predictive control (MPC) on the same mass–damper system. The emphasis is on reproducible simulation, constraint handling, and quantitative performance—not on demonstrating that one method is universally better.
 
-This project reconstructs one coherent problem from *Digital Control Technologies and Architectures* coursework at Politecnico di Torino. Rather than covering every assignment, it compares three controller configurations on the **same plant and reference**:
+Developed from *Digital Control Technologies and Architectures* coursework at **Politecnico di Torino**, with a focused MATLAB reconstruction and an accompanying Simulink model of the integral-LQR architecture.
 
-1. **Integral LQR (original)** — fast tracking, no explicit input constraint.
-2. **Integral LQR, R = 100 (new tuning)** — a simple input-penalty alternative, not a constrained LQR.
-3. **Constrained MPC (original tracking settings)** — predictive control with explicit force and predicted-output bounds.
+## System model
 
-The main controller-comparison implementation has **two files**: [`run_project.m`](run_project.m), which walks through the experiment, and [`solve_mpc.m`](solve_mpc.m), which solves one quadratic program. The sections and comments follow the straightforward teaching style of the course's MATLAB examples.
-
-## The model
-
-The original coursework gives the normalized mass–damper equations:
+The normalized continuous-time model is
 
 $$
-\dot{x}=\begin{bmatrix}0&1\\0&-1\end{bmatrix}x+
-\begin{bmatrix}0\\1\end{bmatrix}u,\qquad
- y=\begin{bmatrix}1&0\end{bmatrix}x.
+\dot{x}(t)=\begin{bmatrix}0&1\\0&-1\end{bmatrix}x(t)
++\begin{bmatrix}0\\1\end{bmatrix}u(t),
+\qquad y(t)=\begin{bmatrix}1&0\end{bmatrix}x(t).
 $$
 
-Here $x_1$ is position, $x_2$ is velocity, and $u$ is applied force. The controller is sampled every $T_s=0.05$ s; MATLAB uses `ss` and `c2d(...,'zoh')` to obtain the discrete-time system.
+Here, $x=[p\;v]^T$ contains position and velocity, $u$ is the applied force, and $y=p$ is the controlled output. The plant is discretized with a **zero-order hold** and sampling time $T_s=0.05\,\mathrm{s}$:
 
-The experiment uses a **unit-step position reference**, starting at rest, and compares all controllers over the same 15-second simulation. The longer simulation (beyond the original five-second MPC exercise) allows us to check whether the response remains inside the 1% tolerance band.
+$$x_{k+1}=A_dx_k+B_du_k.$$
 
-## The controllers
+All comparisons use a unit-step position reference, zero initial position and velocity, and identical plant dynamics.
 
-**Integral LQR.** An error integrator is added to the discrete states:
+## Control strategies
 
-$$q_{k+1}=q_k+T_s(r-y_k),\qquad u_k=-K[q_k\quad x_k^T]^T.$$
+### Integral-action LQR
 
-The original controller uses $Q=\operatorname{diag}(850,150,1)$ and $R=1$. A second run changes only $R$ to 100 to explore the cost of reducing force demand. It **does not** enforce a hard force bound.
+A discrete integrator accumulates the position-tracking error:
 
-**Constrained MPC.** At each sample, MPC predicts 25 future positions and optimizes 25 changes in force $\Delta u$. Its original tracking cost is
+$$q_{k+1}=q_k+T_s(r_k-y_k),\qquad
+u_k=-K\begin{bmatrix}q_k\\x_k\end{bmatrix}.$$
+
+The baseline uses $Q=\mathrm{diag}(850,150,1)$ and $R=1$. A second LQR design increases the input weight to **$R=100$** to illustrate the effect of discouraging large control forces. Neither LQR design imposes a hard force constraint.
+
+### Constrained MPC
+
+MPC predicts **25 samples ahead** and optimizes a sequence of input changes, $\Delta u_k=u_k-u_{k-1}$. The quadratic objective is
 
 $$
-J=\sum_{i=1}^{25}120000(y_{k+i|k}-1)^2
-+\sum_{i=0}^{24}120(\Delta u_{k+i|k})^2,
+J=\sum_{i=1}^{25}120000\big(y_{k+i\mid k}-r\big)^2
++\sum_{i=0}^{24}120\big(\Delta u_{k+i\mid k}\big)^2,
 $$
 
-subject to the predicted **sampled-time** constraints
+subject to predicted sampled-time constraints
 
-$$-1\leq u_{k+i|k}\leq1,\qquad y_{k+i|k}\leq1.0099.$$
+$$-1\leq u_{k+i\mid k}\leq1,\qquad y_{k+i\mid k}\leq1.0099.$$
 
-The optimizer is MATLAB's `quadprog`. The code applies only the first optimized force change before solving again at the next sample. **This controller does not have a hard input-rate bound**; the increment is penalized in the cost. The input-rate-constrained regulation problem was excluded to keep this repository focused.
+A quadratic program is solved with MATLAB's `quadprog` at each sampling instant; only the first move is applied before the problem is solved again. **Input changes are penalized, not hard-limited** in this tracking configuration.
 
 ## Results
 
-The figures and table below were generated with an **independently executed Python/SciPy + CasADi reconstruction** of the same specified model and controller designs, *not* with MATLAB or the original Simulink files. Running the MATLAB script produces separately named MATLAB outputs.
+The two plots below compare **position tracking** and **applied force** under identical nominal conditions.
 
-### Position response
+### Position tracking
 
-![Position response comparing three controllers](figures/tracking_independent.png)
+![Position tracking comparison](figures/tracking_independent.png)
 
-### Applied force
+### Control input
 
-![Applied force comparing three controllers](figures/force_independent.png)
+![Applied force and actuator bound](figures/force_independent.png)
 
-| Controller | 1% settling time | Peak \|force\| | Input energy $T_s\sum u_k^2$ |
-|---|---:|---:|---:|
-| Integral LQR, original | 2.014 s | **3.121** | 3.885 |
-| Integral LQR, $R=100$ (new tuning) | 5.165 s | **0.866** | 0.796 |
+| Controller | 1% settling time | Peak absolute force | Input energy $T_s\sum_k u_k^2$ |
+|:--|--:|--:|--:|
+| Integral LQR, baseline | 2.014 s | 3.121 | 3.885 |
+| Integral LQR, $R=100$ | 5.165 s | 0.866 | 0.796 |
 | Constrained MPC | **1.991 s** | **1.000** | 2.145 |
 
-**Interpretation:** The original integral LQR reaches the tracking target but would exceed a ±1 actuator limit. Increasing its input penalty reduces the demanded force below the limit *in this nominal simulation*, but its settling time becomes much longer. The configured MPC gives similar nominal settling to the original LQR while explicitly respecting the ±1 force bound.
+**Main observation.** The baseline LQR tracks quickly but demands a force greater than the $\pm1$ actuator limit. The more conservative LQR remains below that limit in this nominal case but settles much more slowly. The configured MPC achieves approximately two-second tracking while directly enforcing the force bound. These results compare particular designs, **not the best possible tuning of either controller**.
 
-This does **not** mean MPC always outperforms LQR, or that this is the optimal LQR tuning. The original LQR and MPC also minimize different cost functions. The experiment isolates a practical constraint-handling trade-off for these chosen designs.
+*Result provenance:* The plotted trajectories and tabulated values come from an independently executed Python/SciPy–CasADi reconstruction of the stated model and controllers. They have **not yet been reproduced by running the packaged MATLAB code**. See [verification notes](VALIDATION.md).
 
-**Sampled-data detail:** The MPC meets its upper output bound at the prediction/sampling instants. The independent reconstruction found a small **intersample exceedance** of approximately $5.37\times10^{-5}$ above 1.0099, so we do not claim a continuous-time output guarantee. The force is held constant between samples, so its sampled magnitude limit also applies between samples.
+## Simulink control architecture
 
-## Run in MATLAB
+The repository includes an **editable Simulink implementation of the integral-action LQR**. It uses sampled reference-error integration and state feedback to control a continuous-time mass–damper plant through a zero-order hold.
 
-**Requirements:** MATLAB with **Control System Toolbox** (`ss`, `c2d`, `dlqr`, `ctrb`) and **Optimization Toolbox** (`quadprog`). MATLAB R2018b or newer is recommended for `yline`, along with `optimoptions`. Simulink is **optional**: the main project does not require the legacy MPCtools package.
-
-1. Download and extract the repository.
-2. Set MATLAB's Current Folder to the extracted folder.
-3. Run:
-
-```matlab
-run_project
+```mermaid
+flowchart LR
+    R["Position reference r(k)"] --> E["Tracking error e(k) = r(k) − y(k)"]
+    E --> I["Discrete integrator q(k)"]
+    I --> KI["Integral feedback −Kq"]
+    KI --> S((Sum))
+    X["Measured states x"] --> KX["State feedback −Kx"]
+    KX --> S
+    S --> ZOH["Zero-order hold Ts = 0.05 s"]
+    ZOH --> P["Continuous mass–damper plant"]
+    P --> X
+    X --> C["Position output y = Cx"]
+    C --> E
 ```
 
-The command prints a comparison table and generates exactly three output files:
+*Simplified signal-flow diagram of the included Simulink model; not an execution screenshot.*
 
-- `figures/tracking_matlab.png` — position tracking.
-- `figures/force_matlab.png` — applied-force comparison.
-- `results/matlab_comparison.csv` — computed performance metrics.
-
-The MATLAB and independent figures are intentionally saved under **different names** to make the provenance unambiguous. The MATLAB script includes a controllability check, a closed-loop LQR stability check, and QP constraint-residual checks. It uses the exact held-force solution between samples when measuring tracking time.
-
-
-## Optional Simulink demonstration (integral LQR)
-
-The [`simulink/integral_lqr_tracking.slx`](simulink/integral_lqr_tracking.slx) model is preserved from the original course exercise (formerly `sim_p2.slx`). It shows the **sampled error integrator and feedback gains, zero-order hold, and continuous-time mass–damper plant**. This makes the LQR control loop easy to inspect visually.
-
-From MATLAB's Current Folder, run:
+The model contains the reference step, summing junctions, discrete-time integrator, feedback gains, zero-order hold, continuous-time plant, and signal logging. Open the native block diagram in Simulink to inspect its implementation:
 
 ```matlab
 run_simulink_lqr
 open_system('integral_lqr_tracking')
 ```
 
-`run_simulink_lqr.m` defines the required variables (`Ts`, `K_q`, `K_x`, `C`, `sys_x`, `x0`, `x0i`, `t_sim`) and runs the model. It prints the final position and peak commanded force. **Simulink and Control System Toolbox are required.**
+[View the editable Simulink model](simulink/integral_lqr_tracking.slx) · [View the setup script](run_simulink_lqr.m)
 
-This is an **LQR-only** visual model. The MPC controller still runs in `run_project.m`, where `solve_mpc.m` calls `quadprog`. We did not bundle the original MPC Simulink S-function because it depends on the older course MPCtools library and would undermine the simplified, self-contained code. **The `.slx` has been inspected structurally but has not been executed or validated in MATLAB/Simulink here.**
+**Scope:** Simulink illustrates the **LQR** controller only. Constrained MPC is implemented in MATLAB with `quadprog`, not as a Simulink block. The Simulink file was inspected structurally but has **not yet been run or validated in MATLAB/Simulink** in this environment.
 
-The original lecture archive contained PDF depictions rather than an editable Simulink model. This `.slx` was taken from the user's uploaded original coursework files and retains its course attribution; it is not a newly authored or MATLAB-validated model.
+## Reproduce the comparison
 
-## Read the code
+**Requirements:** MATLAB, Control System Toolbox, and Optimization Toolbox. Simulink is optional for viewing and running the LQR block diagram.
 
-Read [`run_project.m`](run_project.m) from top to bottom:
+1. Clone or download the repository and open its root folder in MATLAB.
+2. Run the complete comparison:
 
-1. Define the plant and discretize it.
-2. Design the LQR controllers using `dlqr`.
-3. Build simple prediction matrices for MPC.
-4. Simulate all three controllers on the same plant.
-5. Compute metrics and create two figures.
+   ```matlab
+   run_project
+   ```
 
-The other file, [`solve_mpc.m`](solve_mpc.m), turns the prediction matrices into one `quadprog` problem. It is kept separate because that QP repeats at every sample; the main script remains readable.
+3. Optionally inspect the LQR model using the Simulink commands above.
 
-## Verification and scope
+The main script prints a performance table and generates **two figures** and one CSV table. To preserve traceability, newly generated MATLAB outputs use different filenames from the independent verification plots already included in the repository.
 
-- Original MATLAB/Simulink execution: **not yet performed** in this environment. The MATLAB code is newly reconstructed and still requires a local MATLAB run.
-- Independent Python verification: **performed** for the same plant, prediction matrices, cost weights, and constraints. The first MPC QP was also compared across independent QP formulations and solvers in the earlier validation workflow.
-- A new check confirmed that the **simplified** augmented prediction matrices agree with the previously verified implementation to numerical precision.
-- The sample figure/CSV values were copied from that earlier executed independent validation. They are **not claimed as generated by the new MATLAB code**.
-- This is a deterministic, full-state, nominal linear model with no measurement noise or external disturbances. It is **not** a vehicle model and offers no formal robustness or real-time feasibility guarantees.
+### Repository contents
 
-See [verification notes](VALIDATION.md) for details.
+| File or directory | Purpose |
+|:--|:--|
+| [`run_project.m`](run_project.m) | Plant discretization, LQR design, MPC comparison, metrics, and figures |
+| [`solve_mpc.m`](solve_mpc.m) | Receding-horizon quadratic-program solution |
+| [`run_simulink_lqr.m`](run_simulink_lqr.m) | Simulink initialization and optional simulation |
+| [`simulink/`](simulink/) | Editable integral-action LQR model |
+| [`figures/`](figures/) | Two independently generated comparison plots |
+| [`results/`](results/) | Independently generated metrics table |
+| [`VALIDATION.md`](VALIDATION.md) | Numerical checks, provenance, and known limitations |
 
-## Coursework attribution
+## Interpretation and limitations
 
-Original plant, reference-tracking requirements, and controller configurations are from *Digital Control Technologies and Architectures*, Politecnico di Torino (course materials by M. Canale): the discrete-LQR/integral-action and predictive tracking exercises. For teaching style and derivations, this refactor also consulted `DiCTAr_L06_v07_example_1.m.pdf` (straightforward MATLAB examples), `DiCTAr_L07_v07.pdf` (LQ control), and `DiCTAr_L08_v09_examples (1).pdf` (finite-horizon quadratic optimization and receding-horizon control) supplied in `Lectures.zip`.
+- The model is **linear, normalized, deterministic, and fully observed**. It is a control-method demonstration, not a vehicle-dynamics model.
+- The nominal force bound applies to the MPC's held input; the **output bound is enforced at prediction instants**. Independent simulation found a small continuous-time intersample exceedance (approximately $5.37\times10^{-5}$ above the specified output ceiling).
+- The two LQR settings and MPC have **different cost functions**; the results should be interpreted as an illustrative controller-design trade-off rather than a globally optimized comparison.
+- No robustness, state-estimation, hardware, real-time feasibility, or formal MPC stability guarantees are claimed.
+- The MATLAB and Simulink files still require **runtime validation in MATLAB**. Independent numerical checks and their limitations are documented in [VALIDATION.md](VALIDATION.md).
 
-The two MATLAB implementation files here are **newly written reconstructions**, not copies of the university scripts. A single original coursework `.slx` model for integral-action LQR is included as an **optional**, separately attributed example. The original PDFs and MPCtools source are not redistributed. The original coursework values are clearly distinguished from the new $R=100$ comparison and extended simulation duration.
+## Acknowledgment
+
+The system model, control objectives, and baseline controller settings originate from *Digital Control Technologies and Architectures*, **Politecnico di Torino** (course instruction by M. Canale). The main MATLAB scripts are reconstructed implementations; the included integral-LQR Simulink model originates from the coursework. The $R=100$ LQR comparison and longer simulation interval are additional analysis choices. This repository does not redistribute the teaching handouts or legacy MPC library.
