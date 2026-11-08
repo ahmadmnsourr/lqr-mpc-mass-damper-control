@@ -10,7 +10,7 @@ This project reconstructs one coherent problem from *Digital Control Technologie
 2. **Integral LQR, R = 100 (new tuning)** — a simple input-penalty alternative, not a constrained LQR.
 3. **Constrained MPC (original tracking settings)** — predictive control with explicit force and predicted-output bounds.
 
-The entire MATLAB implementation has **two files**: [`run_project.m`](run_project.m), which walks through the experiment, and [`solve_mpc.m`](solve_mpc.m), which solves one quadratic program. The sections and comments follow the straightforward teaching style of the course's MATLAB examples.
+The main controller-comparison implementation has **two files**: [`run_project.m`](run_project.m), which walks through the experiment, and [`solve_mpc.m`](solve_mpc.m), which solves one quadratic program. The sections and comments follow the straightforward teaching style of the course's MATLAB examples.
 
 ## The model
 
@@ -73,7 +73,7 @@ This does **not** mean MPC always outperforms LQR, or that this is the optimal L
 
 ## Run in MATLAB
 
-**Requirements:** MATLAB with **Control System Toolbox** (`ss`, `c2d`, `dlqr`, `ctrb`) and **Optimization Toolbox** (`quadprog`). MATLAB R2018b or newer is recommended for `yline`, along with `optimoptions`. No Simulink model or external MPCtools package is needed.
+**Requirements:** MATLAB with **Control System Toolbox** (`ss`, `c2d`, `dlqr`, `ctrb`) and **Optimization Toolbox** (`quadprog`). MATLAB R2018b or newer is recommended for `yline`, along with `optimoptions`. Simulink is **optional**: the main project does not require the legacy MPCtools package.
 
 1. Download and extract the repository.
 2. Set MATLAB's Current Folder to the extracted folder.
@@ -90,6 +90,24 @@ The command prints a comparison table and generates exactly three output files:
 - `results/matlab_comparison.csv` — computed performance metrics.
 
 The MATLAB and independent figures are intentionally saved under **different names** to make the provenance unambiguous. The MATLAB script includes a controllability check, a closed-loop LQR stability check, and QP constraint-residual checks. It uses the exact held-force solution between samples when measuring tracking time.
+
+
+## Optional Simulink demonstration (integral LQR)
+
+The [`simulink/integral_lqr_tracking.slx`](simulink/integral_lqr_tracking.slx) model is preserved from the original course exercise (formerly `sim_p2.slx`). It shows the **sampled error integrator and feedback gains, zero-order hold, and continuous-time mass–damper plant**. This makes the LQR control loop easy to inspect visually.
+
+From MATLAB's Current Folder, run:
+
+```matlab
+run_simulink_lqr
+open_system('integral_lqr_tracking')
+```
+
+`run_simulink_lqr.m` defines the required variables (`Ts`, `K_q`, `K_x`, `C`, `sys_x`, `x0`, `x0i`, `t_sim`) and runs the model. It prints the final position and peak commanded force. **Simulink and Control System Toolbox are required.**
+
+This is an **LQR-only** visual model. The MPC controller still runs in `run_project.m`, where `solve_mpc.m` calls `quadprog`. We did not bundle the original MPC Simulink S-function because it depends on the older course MPCtools library and would undermine the simplified, self-contained code. **The `.slx` has been inspected structurally but has not been executed or validated in MATLAB/Simulink here.**
+
+The original lecture archive contained PDF depictions rather than an editable Simulink model. This `.slx` was taken from the user's uploaded original coursework files and retains its course attribution; it is not a newly authored or MATLAB-validated model.
 
 ## Read the code
 
@@ -117,4 +135,4 @@ See [verification notes](VALIDATION.md) for details.
 
 Original plant, reference-tracking requirements, and controller configurations are from *Digital Control Technologies and Architectures*, Politecnico di Torino (course materials by M. Canale): the discrete-LQR/integral-action and predictive tracking exercises. For teaching style and derivations, this refactor also consulted `DiCTAr_L06_v07_example_1.m.pdf` (straightforward MATLAB examples), `DiCTAr_L07_v07.pdf` (LQ control), and `DiCTAr_L08_v09_examples (1).pdf` (finite-horizon quadratic optimization and receding-horizon control) supplied in `Lectures.zip`.
 
-The two MATLAB implementation files here are **newly written reconstructions**, not copies of the university scripts. The original PDFs, Simulink models, and MPCtools source are not redistributed. The original coursework values are clearly distinguished from the new $R=100$ comparison and extended simulation duration.
+The two MATLAB implementation files here are **newly written reconstructions**, not copies of the university scripts. A single original coursework `.slx` model for integral-action LQR is included as an **optional**, separately attributed example. The original PDFs and MPCtools source are not redistributed. The original coursework values are clearly distinguished from the new $R=100$ comparison and extended simulation duration.

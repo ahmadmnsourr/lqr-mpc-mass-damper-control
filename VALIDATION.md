@@ -20,7 +20,7 @@ These measurements were generated from an earlier, larger Python verification pa
 ## What was NOT checked
 
 - The focused `run_project.m` and `solve_mpc.m` have not been executed in MATLAB. MATLAB toolboxes were unavailable here. The independently checked model mathematics and prediction matrices do not replace this runtime validation.
-- The original course Simulink S-functions have not been re-executed and are not bundled.
+- The optional original integral-LQR Simulink model has been inspected structurally, but not executed in MATLAB/Simulink. The separate course MPC Simulink S-functions are not bundled.
 - No code-generation, hardware, robustness, formal closed-loop MPC stability, or real-time computational performance is claimed.
 - One retuned LQR design (`R=100`) is **not** proof that no other LQR tuning could meet the force and tracking objectives simultaneously.
 
