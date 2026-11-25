@@ -199,6 +199,3 @@ The codebase is intentionally small:
 - No robustness guarantee, state estimator, real-time execution benchmark, hardware validation, or formal MPC stability proof is claimed.
 - MATLAB and Simulink runtime validation remains outstanding; see [verification notes](VALIDATION.md).
 
-## Acknowledgment
-
-The normalized plant, control objectives, and baseline tuning are adapted from *Digital Control Technologies and Architectures*, **Politecnico di Torino** (M. Canale). The MATLAB comparison and MPC optimizer are newly written reconstructions of the coursework methods. The included editable LQR Simulink model originates from the coursework. The extra $R=100$ LQR comparison and extended simulation interval are separately identified additions.
